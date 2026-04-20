@@ -1,76 +1,104 @@
-# 8x8 Asynchronous FIFO
+# Parameterized Asynchronous FIFO
 
-This project implements an **8-entry, 8-bit asynchronous FIFO** in Verilog.
-It supports separate write and read clock domains, so data can be written and
-read safely even when the two clocks are unrelated.
+This repository contains a synthesizable asynchronous FIFO implemented in Verilog with separate write and read clock domains. The design is now structured more like reusable IP than a fixed 8x8 classroom example: it is parameterized, exposes integration-friendly status signals, and includes a broader self-checking testbench.
 
-## Files
+## Features
 
-- `fifo.v` - synthesizable FIFO module
-- `tb_fifo.v` - self-checking testbench
-- `README.md` - project documentation
+- Parameterized `DATA_WIDTH` and `ADDR_WIDTH`
+- Power-of-two FIFO depth: `DEPTH = 2**ADDR_WIDTH`
+- Gray-coded read and write pointers for clock-domain crossing
+- Two-flop synchronizers on the crossed Gray pointers
+- Active-high resets with asynchronous assertion and internally synchronized release
+- Handshake/status outputs for integration and debug:
+  - `wr_ack`, `overflow`, `full`, `almost_full`, `wr_count`
+  - `rd_valid`, `underflow`, `empty`, `almost_empty`, `rd_count`
+- Self-checking verification covering directed and randomized asynchronous traffic
 
-## FIFO Overview
+## Repository Contents
 
-An asynchronous FIFO stores data in a small memory and uses separate pointers
-for writing and reading.
+- `fifo.v` - synthesizable asynchronous FIFO RTL
+- `tb_fifo.v` - self-checking verification testbench
+- `README.md` - design and usage notes
 
-### Key signals
+## Parameters
 
-| Signal | Description |
-| --- | --- |
-| `wr_clk` | Write clock |
-| `wr_rst` | Write-domain reset, active high |
-| `wr_en` | Write enable |
-| `wr_data[7:0]` | Data written into the FIFO |
-| `rd_clk` | Read clock |
-| `rd_rst` | Read-domain reset, active high |
-| `rd_en` | Read enable |
-| `rd_data[7:0]` | Data read from the FIFO |
-| `full` | FIFO is full |
-| `empty` | FIFO is empty |
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `DATA_WIDTH` | `8` | Width of each FIFO word |
+| `ADDR_WIDTH` | `3` | Address width; FIFO depth is `2**ADDR_WIDTH` |
+| `ALMOST_FULL_MARGIN` | `1` | `almost_full` asserts when free space is less than or equal to this margin |
+| `ALMOST_EMPTY_MARGIN` | `1` | `almost_empty` asserts when occupancy is less than or equal to this margin |
 
-The module also exposes `wr_ptr` and `rd_ptr` as 3-bit debug pointers.
+## Interface
 
-## Design Method
+### Write clock domain
 
-The FIFO uses:
+| Signal | Dir | Width | Description |
+| --- | --- | --- | --- |
+| `wr_clk` | In | 1 | Write clock |
+| `wr_rst` | In | 1 | Active-high write-domain reset |
+| `wr_en` | In | 1 | Write request |
+| `wr_data` | In | `DATA_WIDTH` | Write data |
+| `wr_ptr` | Out | `ADDR_WIDTH` | Lower address bits of the write pointer, mainly for debug/visibility |
+| `wr_count` | Out | `ADDR_WIDTH+1` | Local write-domain occupancy estimate |
+| `wr_ack` | Out | 1 | One-cycle pulse when a write is accepted |
+| `overflow` | Out | 1 | One-cycle pulse when a write is attempted while full |
+| `full` | Out | 1 | FIFO full indication in the write domain |
+| `almost_full` | Out | 1 | Early warning flag based on `ALMOST_FULL_MARGIN` |
 
-- an 8-word memory array
-- binary write and read pointers
-- Gray-coded pointers for cross-domain synchronization
-- two-flop synchronizers for safe clock-domain crossing
+### Read clock domain
 
-This is the standard safe way to build an asynchronous FIFO.
+| Signal | Dir | Width | Description |
+| --- | --- | --- | --- |
+| `rd_clk` | In | 1 | Read clock |
+| `rd_rst` | In | 1 | Active-high read-domain reset |
+| `rd_en` | In | 1 | Read request |
+| `rd_data` | Out | `DATA_WIDTH` | Read data |
+| `rd_ptr` | Out | `ADDR_WIDTH` | Lower address bits of the read pointer, mainly for debug/visibility |
+| `rd_count` | Out | `ADDR_WIDTH+1` | Local read-domain occupancy estimate |
+| `rd_valid` | Out | 1 | One-cycle pulse when a read is accepted and `rd_data` is updated |
+| `underflow` | Out | 1 | One-cycle pulse when a read is attempted while empty |
+| `empty` | Out | 1 | FIFO empty indication in the read domain |
+| `almost_empty` | Out | 1 | Early warning flag based on `ALMOST_EMPTY_MARGIN` |
 
-### Full/empty behavior
+## Functional Behavior
 
-- `full` asserts when the next write would collide with the synchronized read pointer.
-- `empty` asserts when the next read would collide with the synchronized write pointer.
+- A write is accepted on a `wr_clk` rising edge when `wr_en=1` and `full=0`.
+- `wr_ack` pulses for one `wr_clk` cycle for each accepted write.
+- `overflow` pulses for one `wr_clk` cycle when `wr_en=1` and the FIFO is full.
+- A read is accepted on an `rd_clk` rising edge when `rd_en=1` and `empty=0`.
+- `rd_valid` pulses for one `rd_clk` cycle for each accepted read.
+- `rd_data` is updated on the same `rd_clk` edge that accepts the read.
+- `underflow` pulses for one `rd_clk` cycle when `rd_en=1` and the FIFO is empty.
 
-## Reset Behavior
+## CDC and Reset Notes
 
-Both resets are active high.
+- Read and write pointers are maintained in binary locally and converted to Gray code before crossing clock domains.
+- Each crossed Gray pointer passes through a two-flop synchronizer.
+- The synchronizer registers are tagged with `ASYNC_REG` attributes for implementation flows that honor them.
+- `wr_rst` and `rd_rst` are active high, asynchronously asserted, and internally released synchronously to their respective clocks.
+- For full FIFO reinitialization, assert both resets together. Independent reset sequencing while data is in flight is not treated as a supported recovery mode for this IP instance.
 
-- `wr_rst` resets the write pointer and write-side status logic
-- `rd_rst` resets the read pointer and read-side status logic
+## Counter and Flag Notes
 
-## Testbench Behavior
+- `wr_count` and `rd_count` are domain-local occupancy views computed using synchronized opposite-domain pointers.
+- Because the opposite pointer must cross a synchronizer, these counts can lag real occupancy by synchronization latency.
+- `full` and `empty` are safe control flags for gating transfers.
+- `almost_full` and `almost_empty` are intended as early-warning flow-control indicators, not exact global occupancy guarantees.
 
-The testbench:
+## Verification Scope
 
-1. applies reset
-2. writes 8 bytes to fill the FIFO
-3. checks that `full` asserts
-4. tries one extra write and confirms it is blocked
-5. reads back all stored values in order
-6. verifies `empty`
-7. performs a wrap-around/mixed read-write test
-8. checks the final output sequence and final `empty` state
+The updated testbench is self-checking and covers:
 
-If everything is correct, the testbench prints:
+1. Reset initialization
+2. Full-depth fill and pointer wrap
+3. Overflow protection
+4. Full-depth drain and pointer wrap
+5. Underflow protection
+6. Reset recovery while data is present
+7. Randomized asynchronous read/write traffic with a scoreboard
 
-`TEST PASSED: FIFO behaved correctly.`
+The testbench instantiates the FIFO with non-default parameters (`DATA_WIDTH=16`, `ADDR_WIDTH=4`) so parameterization is exercised, not just declared.
 
 ## Simulation
 
@@ -81,27 +109,20 @@ iverilog -o fifo_tb fifo.v tb_fifo.v
 vvp fifo_tb
 ```
 
-If you use another simulator, compile `fifo.v` and `tb_fifo.v` together and run
-the top module `tb_fifo`.
+Optional waveform viewing:
 
-## Simulation Results
+```bash
+gtkwave fifo.vcd
+```
 
-The following waveform images show the FIFO behavior during simulation.
+## Implementation Notes
 
-### 0 ns to 100 ns
+- FIFO depth must be a power of two because it is derived from `ADDR_WIDTH`.
+- The RTL uses a simple dual-port style memory array. Exact RAM inference behavior depends on the target synthesis tool and technology library.
+- If your implementation flow requires dedicated CDC constraints or vendor-specific pragmas beyond `ASYNC_REG`, add them in the project constraints rather than only in RTL comments.
 
-![FIFO waveform from 0 ns to 100 ns](plot%20%280%20to%20100%20ns%29.png)
+## Suggested Next Steps
 
-### 100 ns to 220 ns
-
-![FIFO waveform from 100 ns to 220 ns](plot%20%28100%20to%20220%20ns%29.png)
-
-### 0 ns to 300 ns
-
-![FIFO waveform from 0 ns to 300 ns](plot%20till%20300ns.png)
-
-## Notes
-
-- The FIFO depth is 8 because the address width is 3 bits.
-- The data width is 8 bits.
-- The module is written to be easy to simulate and explain for a project report.
+- Add linting and CDC checks in your preferred FPGA/ASIC flow
+- Add CI that compiles and runs the testbench automatically
+- Add formal properties for no-overflow/no-underflow and FIFO ordering guarantees
