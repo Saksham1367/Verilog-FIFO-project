@@ -186,14 +186,6 @@ The current checked-in RTL and scripts were rerun locally on April 24, 2026 and 
 | Generic synthesis | PASS | `reports/synthesis/generic_stat.txt` |
 | XC7 out-of-context synthesis | PASS | `reports/synthesis/xc7_ooc_stat.txt` |
 
-Key generated artifacts for screenshots or inspection:
-
-- `fifo.vcd`
-- `artifacts/formal/fifo_formal_bmc.vcd`
-- `artifacts/formal/fifo_formal_cover.vcd`
-- `artifacts/netlist/fifo_generic_netlist.v`
-- `artifacts/netlist/fifo_xc7_ooc_netlist.v`
-- `artifacts/netlist/fifo_xc7_ooc.json`
 
 Current synthesis snapshot:
 
