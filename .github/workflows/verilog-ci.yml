@@ -6,26 +6,62 @@ on:
   workflow_dispatch:
 
 jobs:
-  simulate:
+  pre-signoff:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Icarus Verilog
+      - name: Install Open-Source Verilog Toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y iverilog
+          sudo apt-get install -y iverilog verilator yosys z3 python3
 
-      - name: Compile testbench
-        run: iverilog -g2012 -Wall -o fifo_tb fifo.v tb_fifo.v
+      - name: Prepare report directories
+        run: |
+          mkdir -p reports/cdc reports/formal reports/lint reports/synthesis
+          mkdir -p artifacts/formal artifacts/netlist
 
-      - name: Run simulation
-        run: vvp ./fifo_tb
+      - name: Run Simulation
+        shell: bash
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -o fifo_tb fifo.v tb_fifo.v
+          vvp ./fifo_tb
 
-      - name: Upload waveform dump
+      - name: Run Lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          verilator --lint-only -Wall fifo.v 2>&1 | tee reports/lint/verilator_rtl.txt
+
+      - name: Run CDC Structural Review
+        run: python3 scripts/run_cdc_review.py --rtl fifo.v --out reports/cdc/cdc_review.md
+
+      - name: Run Formal
+        shell: bash
+        run: |
+          set -euo pipefail
+          yosys -l reports/formal/yosys_formal_bmc.log -s formal/fifo_formal.ys
+          yosys -l reports/formal/yosys_formal_induction.log -s formal/fifo_formal_induction.ys
+          yosys-smtbmc -s z3 --presat -t 18 --dump-vcd artifacts/formal/fifo_formal_bmc.vcd artifacts/formal/fifo_formal.smt2 2>&1 | tee reports/formal/bmc.log
+          yosys-smtbmc -s z3 --presat -i -t 18 artifacts/formal/fifo_formal_induction.smt2 2>&1 | tee reports/formal/prove.log
+          yosys-smtbmc -s z3 -c -t 24 --dump-vcd artifacts/formal/fifo_formal_cover.vcd artifacts/formal/fifo_formal.smt2 2>&1 | tee reports/formal/cover.log
+
+      - name: Run Synthesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          yosys -l reports/synthesis/generic.log -s synthesis/generic.ys
+          yosys -l reports/synthesis/xc7_ooc.log -s synthesis/xc7_ooc.ys
+
+      - name: Upload Pre-Signoff Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fifo-waveform
-          path: fifo.vcd
+          name: fifo-pre-signoff-artifacts
+          path: |
+            fifo.vcd
+            reports/**
+            artifacts/formal/**
+            artifacts/netlist/**

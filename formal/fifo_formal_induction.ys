@@ -1,0 +1,9 @@
+read_verilog -formal -D FORMAL -D FORMAL_INDUCTION fifo.v
+read_verilog -formal -sv -D FORMAL -D FORMAL_INDUCTION formal/fifo_formal.sv
+prep -top fifo_formal
+flatten
+async2sync
+dffunmap
+opt_clean
+check
+write_smt2 -wires artifacts/formal/fifo_formal_induction.smt2

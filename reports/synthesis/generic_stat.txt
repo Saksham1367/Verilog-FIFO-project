@@ -1,0 +1,33 @@
+
+10. Printing statistics.
+
+=== fifo ===
+
+   Number of wires:                114
+   Number of wire bits:            443
+   Number of public wires:          66
+   Number of public wire bits:     350
+   Number of ports:                 20
+   Number of port bits:             44
+   Number of memories:               0
+   Number of memory bits:            0
+   Number of processes:              0
+   Number of cells:                 95
+     $add                            2
+     $adff                          16
+     $adffe                          1
+     $dffe                           8
+     $eq                            16
+     $ge                             1
+     $le                             1
+     $logic_and                      4
+     $logic_not                      4
+     $mux                           16
+     $not                            4
+     $pmux                           1
+     $reduce_and                     8
+     $reduce_bool                    1
+     $reduce_xor                     8
+     $sub                            2
+     $xor                            2
+

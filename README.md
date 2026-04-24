@@ -1,6 +1,6 @@
 # Parameterized Asynchronous FIFO
 
-This repository contains a synthesizable asynchronous FIFO implemented in Verilog with separate write and read clock domains. The design is now structured more like reusable IP than a fixed 8x8 classroom example: it is parameterized, exposes integration-friendly status signals, and includes a broader self-checking testbench.
+This repository contains a synthesizable asynchronous FIFO implemented in Verilog with separate write and read clock domains. The design is now structured more like reusable IP than a fixed 8x8 classroom example: it is parameterized, exposes integration-friendly status signals, includes a broader self-checking testbench, and carries an open-source pre-signoff flow covering lint, CDC review, formal, and synthesis.
 
 ## Features
 
@@ -13,13 +13,19 @@ This repository contains a synthesizable asynchronous FIFO implemented in Verilo
   - `wr_ack`, `overflow`, `full`, `almost_full`, `wr_count`
   - `rd_valid`, `underflow`, `empty`, `almost_empty`, `rd_count`
 - Self-checking verification covering directed and randomized asynchronous traffic
+- Open-source pre-signoff automation for simulation, lint, CDC review, formal, and synthesis
 
 ## Repository Contents
 
 - `fifo.v` - synthesizable asynchronous FIFO RTL
 - `tb_fifo.v` - self-checking verification testbench
-- `scripts/` - local automation for simulation, waveform export, and GTKWave launch
-- `.github/workflows/verilog-ci.yml` - GitHub Actions simulation check
+- `formal/` - formal harnesses and Yosys scripts
+- `synthesis/` - generic and Xilinx XC7 out-of-context synthesis scripts
+- `constraints/` - example implementation constraints and CDC guidance
+- `scripts/` - local automation for simulation, waveform export, CDC review, formal, and synthesis
+- `reports/` - generated lint, CDC, formal, and synthesis reports
+- `artifacts/` - generated waveform images, formal traces, and synthesized netlists
+- `.github/workflows/verilog-ci.yml` - GitHub Actions pre-signoff flow
 - `README.md` - design and usage notes
 
 ## Parameters
@@ -138,6 +144,72 @@ python .\scripts\export_wave_plots.py --vcd .\fifo.vcd --outdir .\artifacts\wave
 powershell -ExecutionPolicy Bypass -File .\scripts\open_wave.ps1
 ```
 
+## Pre-Signoff Flow
+
+Run the full pre-FPGA verification and synthesis flow on Windows with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_signoff.ps1
+```
+
+That script performs:
+
+1. self-checking simulation
+2. RTL lint with Verilator
+3. structural CDC review
+4. formal bounded proof, induction, and cover analysis
+5. generic synthesis with Yosys
+6. Xilinx 7-series out-of-context synthesis with Yosys
+
+Generated outputs are written to:
+
+- `reports/lint/verilator_rtl.txt`
+- `reports/cdc/cdc_review.md`
+- `reports/formal/`
+- `reports/synthesis/`
+- `artifacts/formal/`
+- `artifacts/netlist/`
+
+## Latest Pre-Signoff Results
+
+The current checked-in RTL and scripts were rerun locally on April 24, 2026 and produced the following results:
+
+| Flow | Result | Evidence |
+| --- | --- | --- |
+| Simulation | PASS | `TEST PASSED: parameterized asynchronous FIFO behaved correctly.` |
+| Randomized traffic | PASS | Random phase completed with `102` accepted writes and `102` accepted reads |
+| Lint | PASS | `reports/lint/verilator_rtl.txt` |
+| CDC structural review | PASS | `reports/cdc/cdc_review.md` |
+| Formal BMC | PASS | `reports/formal/bmc.log` |
+| Formal induction | PASS | `reports/formal/prove.log` |
+| Formal cover | PASS | `reports/formal/cover.log` |
+| Generic synthesis | PASS | `reports/synthesis/generic_stat.txt` |
+| XC7 out-of-context synthesis | PASS | `reports/synthesis/xc7_ooc_stat.txt` |
+
+Key generated artifacts for screenshots or inspection:
+
+- `fifo.vcd`
+- `artifacts/formal/fifo_formal_bmc.vcd`
+- `artifacts/formal/fifo_formal_cover.vcd`
+- `artifacts/netlist/fifo_generic_netlist.v`
+- `artifacts/netlist/fifo_xc7_ooc_netlist.v`
+- `artifacts/netlist/fifo_xc7_ooc.json`
+
+Current synthesis snapshot:
+
+- Generic mapped netlist: `95` cells
+- Xilinx XC7 out-of-context mapping: estimated `63` logic cells
+- XC7 cell mix: `4` `CARRY4`, `43` `FDCE`, `5` `FDPE`, `64` `FDRE`, `42` `LUT2`, `9` `LUT3`, `4` `LUT4`, `1` `LUT5`, `34` `LUT6`
+
+## Formal Scope
+
+The formal flow is intentionally split into two layers:
+
+- A stronger bounded proof model checks ordering-related behavior and generates `artifacts/formal/fifo_formal_bmc.vcd`
+- A reduced inductive model proves persistent safety properties cleanly in open-source tooling
+
+The RTL exposes `FORMAL`-guarded observation ports used only by the proof harness. These ports are not present in normal simulation or synthesis builds.
+
 ## Waveform Results
 
 The following plots capture the FIFO behavior across the full 0 us to 3 us simulation window in 500 ns segments.
@@ -171,4 +243,4 @@ The following plots capture the FIFO behavior across the full 0 us to 3 us simul
 - FIFO depth must be a power of two because it is derived from `ADDR_WIDTH`.
 - The RTL uses a simple dual-port style memory array. Exact RAM inference behavior depends on the target synthesis tool and technology library.
 - If your implementation flow requires dedicated CDC constraints or vendor-specific pragmas beyond `ASYNC_REG`, add them in the project constraints rather than only in RTL comments.
-
+- `constraints/fifo_async_example.xdc` is an example starting point for implementation-time clocking and CDC constraints. It is not a complete board-specific XDC.

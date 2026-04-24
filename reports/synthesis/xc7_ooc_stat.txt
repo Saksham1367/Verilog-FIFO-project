@@ -1,0 +1,27 @@
+
+4. Printing statistics.
+
+=== fifo ===
+
+   Number of wires:                110
+   Number of wire bits:            469
+   Number of public wires:          61
+   Number of public wire bits:     336
+   Number of ports:                 20
+   Number of port bits:             44
+   Number of memories:               0
+   Number of memory bits:            0
+   Number of processes:              0
+   Number of cells:                206
+     CARRY4                          4
+     FDCE                           43
+     FDPE                            5
+     FDRE                           64
+     LUT2                           42
+     LUT3                            9
+     LUT4                            4
+     LUT5                            1
+     LUT6                           34
+
+   Estimated number of LCs:         63
+

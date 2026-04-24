@@ -1,0 +1,11 @@
+read_verilog fifo.v
+hierarchy -top fifo
+proc
+opt
+fsm
+opt
+memory
+opt
+check
+tee -o reports/synthesis/generic_stat.txt stat
+write_verilog -noattr artifacts/netlist/fifo_generic_netlist.v

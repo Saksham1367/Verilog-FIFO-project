@@ -26,6 +26,11 @@ module fifo #(
     output reg                   underflow,
     output reg                   empty,
     output wire                  almost_empty
+`ifdef FORMAL
+    ,
+    output wire [ADDR_WIDTH:0]   formal_wr_bin,
+    output wire [ADDR_WIDTH:0]   formal_rd_bin
+`endif
 );
     localparam integer DEPTH     = (1 << ADDR_WIDTH);
     localparam integer PTR_WIDTH = ADDR_WIDTH + 1;
@@ -56,6 +61,10 @@ module fifo #(
     wire [PTR_WIDTH-1:0] wr_bin_sync;
     wire [PTR_WIDTH-1:0] wr_count_int;
     wire [PTR_WIDTH-1:0] rd_count_int;
+    wire [31:0]          wr_count_cmp;
+    wire [31:0]          rd_count_cmp;
+    wire [PTR_WIDTH-1:0] wr_push_ext;
+    wire [PTR_WIDTH-1:0] rd_pop_ext;
     wire                  wr_push;
     wire                  rd_pop;
     wire                  full_next;
@@ -72,9 +81,9 @@ module fifo #(
         input [PTR_WIDTH-1:0] gray;
         integer idx;
         begin
-            gray2bin[PTR_WIDTH-1] = gray[PTR_WIDTH-1];
-            for (idx = PTR_WIDTH-2; idx >= 0; idx = idx - 1) begin
-                gray2bin[idx] = gray2bin[idx+1] ^ gray[idx];
+            gray2bin = {PTR_WIDTH{1'b0}};
+            for (idx = 0; idx < PTR_WIDTH; idx = idx + 1) begin
+                gray2bin[idx] = ^(gray >> idx);
             end
         end
     endfunction
@@ -112,9 +121,11 @@ module fifo #(
 
     assign wr_push = wr_en && !full;
     assign rd_pop  = rd_en && !empty;
+    assign wr_push_ext = {{PTR_WIDTH-1{1'b0}}, wr_push};
+    assign rd_pop_ext  = {{PTR_WIDTH-1{1'b0}}, rd_pop};
 
-    assign wr_bin_next  = wr_bin + wr_push;
-    assign rd_bin_next  = rd_bin + rd_pop;
+    assign wr_bin_next  = wr_bin + wr_push_ext;
+    assign rd_bin_next  = rd_bin + rd_pop_ext;
     assign wr_gray_next = bin2gray(wr_bin_next);
     assign rd_gray_next = bin2gray(rd_bin_next);
 
@@ -123,16 +134,22 @@ module fifo #(
 
     assign wr_count_int = wr_bin - rd_bin_sync;
     assign rd_count_int = wr_bin_sync - rd_bin;
+    assign wr_count_cmp = {{(32-PTR_WIDTH){1'b0}}, wr_count_int};
+    assign rd_count_cmp = {{(32-PTR_WIDTH){1'b0}}, rd_count_int};
 
     assign wr_ptr = wr_bin[ADDR_WIDTH-1:0];
     assign rd_ptr = rd_bin[ADDR_WIDTH-1:0];
     assign wr_count = wr_count_int;
     assign rd_count = rd_count_int;
+`ifdef FORMAL
+    assign formal_wr_bin = wr_bin;
+    assign formal_rd_bin = rd_bin;
+`endif
 
     assign full_next    = (wr_gray_next == invert_msb2(rd_gray_sync2));
     assign empty_next   = (rd_gray_next == wr_gray_sync2);
-    assign almost_full  = (wr_count_int >= (DEPTH - ALMOST_FULL_MARGIN));
-    assign almost_empty = (rd_count_int <= ALMOST_EMPTY_MARGIN);
+    assign almost_full  = (wr_count_cmp >= (DEPTH - ALMOST_FULL_MARGIN));
+    assign almost_empty = (rd_count_cmp <= ALMOST_EMPTY_MARGIN);
 
     always @(posedge wr_clk or posedge wr_rst) begin
         if (wr_rst) begin

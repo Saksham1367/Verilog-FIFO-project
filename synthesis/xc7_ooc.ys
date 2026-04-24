@@ -1,0 +1,6 @@
+read_verilog fifo.v
+hierarchy -top fifo
+synth_xilinx -family xc7 -top fifo -noiopad -noclkbuf
+tee -o reports/synthesis/xc7_ooc_stat.txt stat -tech xilinx
+write_verilog -noattr artifacts/netlist/fifo_xc7_ooc_netlist.v
+write_json artifacts/netlist/fifo_xc7_ooc.json
