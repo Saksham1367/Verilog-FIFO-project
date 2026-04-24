@@ -1,0 +1,31 @@
+name: verilog-ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+
+      - name: Compile testbench
+        run: iverilog -g2012 -Wall -o fifo_tb fifo.v tb_fifo.v
+
+      - name: Run simulation
+        run: vvp ./fifo_tb
+
+      - name: Upload waveform dump
+        uses: actions/upload-artifact@v4
+        with:
+          name: fifo-waveform
+          path: fifo.vcd

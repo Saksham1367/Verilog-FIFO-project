@@ -4,6 +4,7 @@
 *.jou
 *.wlf
 *.fst
+fifo_tb
 simv
 simv.daidir/
 csrc/

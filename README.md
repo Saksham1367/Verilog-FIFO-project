@@ -18,6 +18,8 @@ This repository contains a synthesizable asynchronous FIFO implemented in Verilo
 
 - `fifo.v` - synthesizable asynchronous FIFO RTL
 - `tb_fifo.v` - self-checking verification testbench
+- `scripts/` - local automation for simulation, waveform export, and GTKWave launch
+- `.github/workflows/verilog-ci.yml` - GitHub Actions simulation check
 - `README.md` - design and usage notes
 
 ## Parameters
@@ -115,6 +117,55 @@ Optional waveform viewing:
 gtkwave fifo.vcd
 ```
 
+Local automation on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_full_flow.ps1
+```
+
+That command:
+
+1. compiles `fifo.v` and `tb_fifo.v`
+2. runs the self-checking simulation
+3. generates waveform PNGs under `artifacts/waveforms/`
+4. opens `fifo.vcd` in GTKWave with a curated FIFO trace list
+
+If you only want individual steps:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_sim.ps1
+python .\scripts\export_wave_plots.py --vcd .\fifo.vcd --outdir .\artifacts\waveforms
+powershell -ExecutionPolicy Bypass -File .\scripts\open_wave.ps1
+```
+
+## Waveform Results
+
+The following plots capture the FIFO behavior across the full 0 us to 3 us simulation window in 500 ns segments.
+
+### 0 ns to 500 ns
+
+![FIFO waveform from 0 ns to 500 ns](artifacts/Plot%200-500%20%28ns%29.png)
+
+### 500 ns to 1000 ns
+
+![FIFO waveform from 500 ns to 1000 ns](artifacts/plot%20500-1000%20%28ns%29.png)
+
+### 1000 ns to 1500 ns
+
+![FIFO waveform from 1000 ns to 1500 ns](artifacts/plot%201000-1500%20%28ns%29.png)
+
+### 1500 ns to 2000 ns
+
+![FIFO waveform from 1500 ns to 2000 ns](artifacts/plot%201500-2000%20%28ns%29.png)
+
+### 2000 ns to 2500 ns
+
+![FIFO waveform from 2000 ns to 2500 ns](artifacts/plot%202000-2500%28ns%29.png)
+
+### 2500 ns to 3000 ns
+
+![FIFO waveform from 2500 ns to 3000 ns](artifacts/plot%202500-3000%20%28ns%29.png)
+
 ## Implementation Notes
 
 - FIFO depth must be a power of two because it is derived from `ADDR_WIDTH`.
@@ -124,5 +175,5 @@ gtkwave fifo.vcd
 ## Suggested Next Steps
 
 - Add linting and CDC checks in your preferred FPGA/ASIC flow
-- Add CI that compiles and runs the testbench automatically
 - Add formal properties for no-overflow/no-underflow and FIFO ordering guarantees
+- Extend CI with lint, CDC, and synthesis jobs for your target device or process
