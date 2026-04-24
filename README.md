@@ -172,8 +172,3 @@ The following plots capture the FIFO behavior across the full 0 us to 3 us simul
 - The RTL uses a simple dual-port style memory array. Exact RAM inference behavior depends on the target synthesis tool and technology library.
 - If your implementation flow requires dedicated CDC constraints or vendor-specific pragmas beyond `ASYNC_REG`, add them in the project constraints rather than only in RTL comments.
 
-## Suggested Next Steps
-
-- Add linting and CDC checks in your preferred FPGA/ASIC flow
-- Add formal properties for no-overflow/no-underflow and FIFO ordering guarantees
-- Extend CI with lint, CDC, and synthesis jobs for your target device or process
